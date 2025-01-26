@@ -27,7 +27,7 @@ io.on('connection', (socket) => {
     // Listen for new messages
     socket.on('sendMessage', (message) => {
         const newMessage = {
-            id: Date.now(),
+            id: Date.now(), // Unique ID for the message
             username: message.username,
             content: message.content,
             timestamp: new Date().toLocaleString(),
@@ -40,14 +40,14 @@ io.on('connection', (socket) => {
     socket.on('editMessage', (editedMessage) => {
         const index = messages.findIndex((msg) => msg.id === editedMessage.id);
         if (index !== -1) {
-            messages[index].content = editedMessage.content;
+            messages[index].content = editedMessage.content; // Update the message content
             io.emit('updateMessage', messages[index]); // Broadcast the updated message
         }
     });
 
     // Listen for message deletions
     socket.on('deleteMessage', (messageId) => {
-        messages = messages.filter((msg) => msg.id !== messageId);
+        messages = messages.filter((msg) => msg.id !== messageId); // Remove the message
         io.emit('removeMessage', messageId); // Broadcast the deleted message ID
     });
 
