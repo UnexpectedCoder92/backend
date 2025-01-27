@@ -14,10 +14,10 @@ const io = new Server(server, {
     },
 });
 
-// Store users, messages, and private messages in memory (replace with a database in production)
+// Store users, messages, and files in memory (replace with a database in production)
 let users = [];
 let messages = [];
-let privateMessages = [];
+let files = [];
 
 // Socket.IO connection
 io.on('connection', (socket) => {
@@ -29,7 +29,7 @@ io.on('connection', (socket) => {
         users.push(user);
         io.emit('userList', users);
         socket.emit('messages', messages);
-        socket.emit('privateMessages', privateMessages.filter(msg => msg.to === username || msg.from === username));
+        socket.emit('files', files);
     });
 
     // Listen for new messages
@@ -44,33 +44,16 @@ io.on('connection', (socket) => {
         io.emit('newMessage', newMessage); // Broadcast the message to all users
     });
 
-    // Listen for private messages
-    socket.on('sendPrivateMessage', (message) => {
-        const newPrivateMessage = {
-            id: Date.now(),
-            from: message.from,
-            to: message.to,
-            content: message.content,
-            timestamp: new Date().toLocaleString(),
-        };
-        privateMessages.push(newPrivateMessage);
-        io.to(users.find(user => user.username === message.to)?.id).emit('newPrivateMessage', newPrivateMessage);
-        socket.emit('newPrivateMessage', newPrivateMessage);
+    // Listen for file uploads
+    socket.on('uploadFile', (file) => {
+        files.push(file);
+        io.emit('updateFiles', files); // Broadcast the updated file list
     });
 
-    // Listen for message edits
-    socket.on('editMessage', (editedMessage) => {
-        const index = messages.findIndex((msg) => msg.id === editedMessage.id);
-        if (index !== -1) {
-            messages[index].content = editedMessage.content;
-            io.emit('updateMessage', messages[index]); // Broadcast the updated message
-        }
-    });
-
-    // Listen for message deletions
-    socket.on('deleteMessage', (messageId) => {
-        messages = messages.filter((msg) => msg.id !== messageId);
-        io.emit('removeMessage', messageId); // Broadcast the deleted message ID
+    // Listen for file deletions
+    socket.on('deleteFile', (fileId) => {
+        files = files.filter(file => file.id !== fileId);
+        io.emit('removeFile', fileId); // Broadcast the deleted file ID
     });
 
     // Handle user disconnect
