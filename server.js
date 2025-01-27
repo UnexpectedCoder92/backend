@@ -18,13 +18,44 @@ const io = new Server(server, {
 let messages = [];
 let files = [];
 
+// Admin credentials (hardcoded for simplicity)
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'nigga';
+
+// Validate username
+function validateUsername(username) {
+    return username.length >= 3 && username.length <= 15;
+}
+
+// Authenticate user
+function authenticate(username, password) {
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        return { username, isAdmin: true };
+    }
+    return null;
+}
+
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Send existing messages and files to the new user
-    socket.emit('messages', messages);
-    socket.emit('files', files);
+    // Listen for login attempts
+    socket.on('login', (data) => {
+        const { username, password } = data;
+        if (!validateUsername(username)) {
+            socket.emit('loginError', 'Username must be 3-15 characters long.');
+            return;
+        }
+
+        const user = authenticate(username, password);
+        if (user) {
+            socket.emit('loginSuccess', user);
+            socket.emit('messages', messages);
+            socket.emit('files', files);
+        } else {
+            socket.emit('loginError', 'Invalid credentials.');
+        }
+    });
 
     // Listen for new messages
     socket.on('sendMessage', (message) => {
@@ -40,10 +71,10 @@ io.on('connection', (socket) => {
 
     // Listen for message edits
     socket.on('editMessage', (data) => {
-        const { id, content, username } = data;
+        const { id, content, username, isAdmin } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (isAdmin || messages[messageIndex].username === username)) {
             messages[messageIndex].content = content;
             io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
         } else {
@@ -53,10 +84,10 @@ io.on('connection', (socket) => {
 
     // Listen for message deletions
     socket.on('deleteMessage', (data) => {
-        const { id, username } = data;
+        const { id, username, isAdmin } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (isAdmin || messages[messageIndex].username === username)) {
             messages = messages.filter((msg) => msg.id !== id);
             io.emit('removeMessage', id); // Broadcast the deleted message ID
         } else {
@@ -71,20 +102,35 @@ io.on('connection', (socket) => {
     });
 
     // Listen for file deletions
-    socket.on('deleteFile', (fileId) => {
-        files = files.filter((file) => file.id !== fileId);
-        io.emit('removeFile', fileId); // Broadcast the deleted file ID
+    socket.on('deleteFile', (data) => {
+        const { fileId, username, isAdmin } = data;
+        const fileIndex = files.findIndex((file) => file.id === fileId);
+
+        if (fileIndex !== -1 && (isAdmin || files[fileIndex].username === username)) {
+            files = files.filter((file) => file.id !== fileId);
+            io.emit('removeFile', fileId); // Broadcast the deleted file ID
+        } else {
+            console.log('Unauthorized delete attempt');
+        }
     });
 
     // Listen for admin actions
-    socket.on('clearAllMessages', () => {
-        messages = [];
-        io.emit('clearAllMessages'); // Broadcast to clear all messages
+    socket.on('clearAllMessages', (data) => {
+        if (data.isAdmin) {
+            messages = [];
+            io.emit('clearAllMessages'); // Broadcast to clear all messages
+        } else {
+            console.log('Unauthorized admin action');
+        }
     });
 
-    socket.on('clearAllUploads', () => {
-        files = [];
-        io.emit('clearAllUploads'); // Broadcast to clear all uploads
+    socket.on('clearAllUploads', (data) => {
+        if (data.isAdmin) {
+            files = [];
+            io.emit('clearAllUploads'); // Broadcast to clear all uploads
+        } else {
+            console.log('Unauthorized admin action');
+        }
     });
 
     // Handle user disconnect
