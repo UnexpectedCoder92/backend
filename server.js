@@ -16,7 +16,7 @@ const io = new Server(server, {
 
 // Admin credentials
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nigga';
 
 // Store chat messages and files in memory (replace with a database in production)
 let messages = [];
