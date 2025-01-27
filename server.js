@@ -18,23 +18,6 @@ const io = new Server(server, {
 let messages = [];
 let files = [];
 
-// Admin credentials (hardcoded for simplicity)
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123';
-
-// Validate username
-function validateUsername(username) {
-    return username.length >= 3 && username.length <= 15;
-}
-
-// Authenticate user
-function authenticate(username, password) {
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        return { username, isAdmin: true };
-    }
-    return null;
-}
-
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
@@ -43,98 +26,65 @@ io.on('connection', (socket) => {
     socket.emit('messages', messages);
     socket.emit('files', files);
 
-    // Listen for login attempts
-    socket.on('login', (data) => {
-        const { username, password } = data;
-        const user = authenticate(username, password);
-
-        if (user) {
-            socket.emit('loginSuccess', user);
-        } else {
-            socket.emit('loginError', 'Invalid credentials');
-        }
-    });
-
     // Listen for new messages
-    socket.on('sendMessage', (data) => {
-        const { username, content } = data;
-        if (username && content) {
-            const newMessage = {
-                id: Date.now().toString(),
-                username,
-                content,
-                timestamp: new Date().toLocaleString(),
-            };
-            messages.push(newMessage);
-            io.emit('newMessage', newMessage); // Broadcast the message to all users
-        }
+    socket.on('sendMessage', (message) => {
+        const newMessage = {
+            id: Date.now().toString(), // Ensure ID is a string
+            username: message.username,
+            content: message.content,
+            timestamp: new Date().toLocaleString(),
+        };
+        messages.push(newMessage);
+        io.emit('newMessage', newMessage); // Broadcast the message to all users
     });
 
     // Listen for message edits
     socket.on('editMessage', (data) => {
-        const { id, content, username, isAdmin } = data;
+        const { id, content, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (isAdmin || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages[messageIndex].content = content;
             io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
+        } else {
+            console.log('Unauthorized edit attempt');
         }
     });
 
     // Listen for message deletions
     socket.on('deleteMessage', (data) => {
-        const { id, username, isAdmin } = data;
+        const { id, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (isAdmin || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages = messages.filter((msg) => msg.id !== id);
             io.emit('removeMessage', id); // Broadcast the deleted message ID
+        } else {
+            console.log('Unauthorized delete attempt');
         }
     });
 
     // Listen for file uploads
-    socket.on('uploadFile', (data) => {
-        const { username, filename, description, content } = data;
-        if (username && filename && content) {
-            const newFile = {
-                id: Date.now().toString(),
-                username,
-                filename,
-                description,
-                content,
-                timestamp: new Date().toLocaleString(),
-            };
-            files.push(newFile);
-            io.emit('newFile', newFile); // Broadcast the new file to all users
-        }
+    socket.on('uploadFile', (file) => {
+        files.push(file);
+        io.emit('newFile', file); // Broadcast the new file to all users
     });
 
     // Listen for file deletions
-    socket.on('deleteFile', (data) => {
-        const { fileId, username, isAdmin } = data;
-        const fileIndex = files.findIndex((file) => file.id === fileId);
-
-        if (fileIndex !== -1 && (isAdmin || files[fileIndex].username === username)) {
-            files = files.filter((file) => file.id !== fileId);
-            io.emit('removeFile', fileId); // Broadcast the deleted file ID
-        }
+    socket.on('deleteFile', (fileId) => {
+        files = files.filter((file) => file.id !== fileId);
+        io.emit('removeFile', fileId); // Broadcast the deleted file ID
     });
 
     // Listen for admin actions
-    socket.on('clearAllMessages', (data) => {
-        const { isAdmin } = data;
-        if (isAdmin) {
-            messages = [];
-            io.emit('clearAllMessages'); // Broadcast to clear all messages
-        }
+    socket.on('clearAllMessages', () => {
+        messages = [];
+        io.emit('clearAllMessages'); // Broadcast to clear all messages
     });
 
-    socket.on('clearAllUploads', (data) => {
-        const { isAdmin } = data;
-        if (isAdmin) {
-            files = [];
-            io.emit('clearAllUploads'); // Broadcast to clear all uploads
-        }
+    socket.on('clearAllUploads', () => {
+        files = [];
+        io.emit('clearAllUploads'); // Broadcast to clear all uploads
     });
 
     // Handle user disconnect
