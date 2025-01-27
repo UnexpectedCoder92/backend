@@ -14,23 +14,15 @@ const io = new Server(server, {
     },
 });
 
-// Store users, messages, and files in memory (replace with a database in production)
-let users = [];
+// Store chat messages in memory (replace with a database in production)
 let messages = [];
-let files = [];
 
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Listen for user login
-    socket.on('login', (username) => {
-        const user = { id: socket.id, username };
-        users.push(user);
-        io.emit('userList', users);
-        socket.emit('messages', messages);
-        socket.emit('files', files);
-    });
+    // Send existing messages to the new user
+    socket.emit('messages', messages);
 
     // Listen for new messages
     socket.on('sendMessage', (message) => {
@@ -44,22 +36,30 @@ io.on('connection', (socket) => {
         io.emit('newMessage', newMessage); // Broadcast the message to all users
     });
 
-    // Listen for file uploads
-    socket.on('uploadFile', (file) => {
-        files.push(file);
-        io.emit('updateFiles', files); // Broadcast the updated file list
+    // Listen for message edits
+    socket.on('editMessage', (editedMessage) => {
+        const index = messages.findIndex((msg) => msg.id === editedMessage.id);
+        if (index !== -1 && messages[index].username === editedMessage.username) {
+            messages[index].content = editedMessage.content;
+            io.emit('updateMessage', messages[index]); // Broadcast the updated message
+        } else {
+            console.log('Unauthorized edit attempt');
+        }
     });
 
-    // Listen for file deletions
-    socket.on('deleteFile', (fileId) => {
-        files = files.filter(file => file.id !== fileId);
-        io.emit('removeFile', fileId); // Broadcast the deleted file ID
+    // Listen for message deletions
+    socket.on('deleteMessage', (data) => {
+        const index = messages.findIndex((msg) => msg.id === data.messageId);
+        if (index !== -1 && messages[index].username === data.username) {
+            messages = messages.filter((msg) => msg.id !== data.messageId);
+            io.emit('removeMessage', data.messageId); // Broadcast the deleted message ID
+        } else {
+            console.log('Unauthorized delete attempt');
+        }
     });
 
     // Handle user disconnect
     socket.on('disconnect', () => {
-        users = users.filter(user => user.id !== socket.id);
-        io.emit('userList', users);
         console.log('A user disconnected:', socket.id);
     });
 });
@@ -67,5 +67,5 @@ io.on('connection', (socket) => {
 // Start the server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server listening on port ${PORT}`);
 });
