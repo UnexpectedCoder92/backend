@@ -14,15 +14,23 @@ const io = new Server(server, {
     },
 });
 
-// Store chat messages in memory (replace with a database in production)
+// Store users, messages, and private messages in memory (replace with a database in production)
+let users = [];
 let messages = [];
+let privateMessages = [];
 
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Send existing messages to the new user
-    socket.emit('messages', messages);
+    // Listen for user login
+    socket.on('login', (username) => {
+        const user = { id: socket.id, username };
+        users.push(user);
+        io.emit('userList', users);
+        socket.emit('messages', messages);
+        socket.emit('privateMessages', privateMessages.filter(msg => msg.to === username || msg.from === username));
+    });
 
     // Listen for new messages
     socket.on('sendMessage', (message) => {
@@ -34,6 +42,20 @@ io.on('connection', (socket) => {
         };
         messages.push(newMessage);
         io.emit('newMessage', newMessage); // Broadcast the message to all users
+    });
+
+    // Listen for private messages
+    socket.on('sendPrivateMessage', (message) => {
+        const newPrivateMessage = {
+            id: Date.now(),
+            from: message.from,
+            to: message.to,
+            content: message.content,
+            timestamp: new Date().toLocaleString(),
+        };
+        privateMessages.push(newPrivateMessage);
+        io.to(users.find(user => user.username === message.to)?.id).emit('newPrivateMessage', newPrivateMessage);
+        socket.emit('newPrivateMessage', newPrivateMessage);
     });
 
     // Listen for message edits
@@ -53,6 +75,8 @@ io.on('connection', (socket) => {
 
     // Handle user disconnect
     socket.on('disconnect', () => {
+        users = users.filter(user => user.id !== socket.id);
+        io.emit('userList', users);
         console.log('A user disconnected:', socket.id);
     });
 });
