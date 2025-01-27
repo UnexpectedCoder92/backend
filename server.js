@@ -17,6 +17,7 @@ const io = new Server(server, {
 // Store chat messages and files in memory (replace with a database in production)
 let messages = [];
 let files = [];
+let users = [];
 
 // Socket.IO connection
 io.on('connection', (socket) => {
@@ -85,6 +86,11 @@ io.on('connection', (socket) => {
     socket.on('clearAllUploads', () => {
         files = [];
         io.emit('clearAllUploads'); // Broadcast to clear all uploads
+    });
+
+    socket.on('clearAllAccounts', () => {
+        users = [];
+        io.emit('clearAllAccounts'); // Broadcast to clear all accounts
     });
 
     // Handle user disconnect
