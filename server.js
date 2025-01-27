@@ -20,7 +20,7 @@ let files = [];
 
 // Admin credentials (hardcoded for simplicity)
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PASSWORD = 'nigga';
 
 // Validate username
 function validateUsername(username) {
