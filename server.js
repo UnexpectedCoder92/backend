@@ -55,6 +55,15 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Listen for admin validation
+    socket.on('validateAdmin', ({ username, password }, callback) => {
+        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+            callback({ success: true, isAdmin: true });
+        } else {
+            callback({ success: false });
+        }
+    });
+    
     // Listen for message deletions
     socket.on('deleteMessage', (data) => {
         const { id, username } = data;
