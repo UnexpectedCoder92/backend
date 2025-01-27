@@ -27,7 +27,7 @@ io.on('connection', (socket) => {
     // Listen for new messages
     socket.on('sendMessage', (message) => {
         const newMessage = {
-            id: Date.now(),
+            id: Date.now().toString(), // Ensure ID is a string
             username: message.username,
             content: message.content,
             timestamp: new Date().toLocaleString(),
@@ -37,11 +37,13 @@ io.on('connection', (socket) => {
     });
 
     // Listen for message edits
-    socket.on('editMessage', (editedMessage) => {
-        const index = messages.findIndex((msg) => msg.id === editedMessage.id);
-        if (index !== -1 && messages[index].username === editedMessage.username) {
-            messages[index].content = editedMessage.content;
-            io.emit('updateMessage', messages[index]); // Broadcast the updated message
+    socket.on('editMessage', (data) => {
+        const { id, content, username } = data;
+        const messageIndex = messages.findIndex((msg) => msg.id === id);
+
+        if (messageIndex !== -1 && messages[messageIndex].username === username) {
+            messages[messageIndex].content = content;
+            io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
         } else {
             console.log('Unauthorized edit attempt');
         }
@@ -49,10 +51,12 @@ io.on('connection', (socket) => {
 
     // Listen for message deletions
     socket.on('deleteMessage', (data) => {
-        const index = messages.findIndex((msg) => msg.id === data.messageId);
-        if (index !== -1 && messages[index].username === data.username) {
-            messages = messages.filter((msg) => msg.id !== data.messageId);
-            io.emit('removeMessage', data.messageId); // Broadcast the deleted message ID
+        const { id, username } = data;
+        const messageIndex = messages.findIndex((msg) => msg.id === id);
+
+        if (messageIndex !== -1 && messages[messageIndex].username === username) {
+            messages = messages.filter((msg) => msg.id !== id);
+            io.emit('removeMessage', id); // Broadcast the deleted message ID
         } else {
             console.log('Unauthorized delete attempt');
         }
