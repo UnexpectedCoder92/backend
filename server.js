@@ -43,7 +43,7 @@ io.on('connection', (socket) => {
         const { id, content, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && messages[messageIndex].username === username) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages[messageIndex].content = content;
             io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
         } else {
@@ -56,7 +56,7 @@ io.on('connection', (socket) => {
         const { id, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && messages[messageIndex].username === username) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages = messages.filter((msg) => msg.id !== id);
             io.emit('removeMessage', id); // Broadcast the deleted message ID
         } else {
@@ -74,6 +74,17 @@ io.on('connection', (socket) => {
     socket.on('deleteFile', (fileId) => {
         files = files.filter((file) => file.id !== fileId);
         io.emit('removeFile', fileId); // Broadcast the deleted file ID
+    });
+
+    // Listen for admin actions
+    socket.on('clearAllMessages', () => {
+        messages = [];
+        io.emit('clearAllMessages'); // Broadcast to clear all messages
+    });
+
+    socket.on('clearAllUploads', () => {
+        files = [];
+        io.emit('clearAllUploads'); // Broadcast to clear all uploads
     });
 
     // Handle user disconnect
