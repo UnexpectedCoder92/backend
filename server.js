@@ -14,15 +14,17 @@ const io = new Server(server, {
     },
 });
 
-// Store chat messages in memory (replace with a database in production)
+// Store chat messages and files in memory (replace with a database in production)
 let messages = [];
+let files = [];
 
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Send existing messages to the new user
+    // Send existing messages and files to the new user
     socket.emit('messages', messages);
+    socket.emit('files', files);
 
     // Listen for new messages
     socket.on('sendMessage', (message) => {
@@ -60,6 +62,18 @@ io.on('connection', (socket) => {
         } else {
             console.log('Unauthorized delete attempt');
         }
+    });
+
+    // Listen for file uploads
+    socket.on('uploadFile', (file) => {
+        files.push(file);
+        io.emit('newFile', file); // Broadcast the new file to all users
+    });
+
+    // Listen for file deletions
+    socket.on('deleteFile', (fileId) => {
+        files = files.filter((file) => file.id !== fileId);
+        io.emit('removeFile', fileId); // Broadcast the deleted file ID
     });
 
     // Handle user disconnect
