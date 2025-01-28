@@ -12,7 +12,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 let messages = [];
 let files = [];
 let users = [];
-const ADMIN = { username: 'admin', password: 'nigga' };
+const ADMIN = { username: 'admin', password: 'hello' };
 
 io.on('connection', (socket) => {
     console.log('New connection:', socket.id);
