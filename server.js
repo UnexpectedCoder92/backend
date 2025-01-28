@@ -14,14 +14,9 @@ const io = new Server(server, {
     },
 });
 
-// Admin credentials
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nigga';
-
 // Store chat messages and files in memory (replace with a database in production)
 let messages = [];
 let files = [];
-let users = []; // Store registered users
 
 // Socket.IO connection
 io.on('connection', (socket) => {
@@ -48,41 +43,11 @@ io.on('connection', (socket) => {
         const { id, content, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (username === ADMIN_USERNAME || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages[messageIndex].content = content;
             io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
         } else {
             console.log('Unauthorized edit attempt');
-        }
-    });
-
-    // Listen for admin validation
-    socket.on('validateAdmin', ({ username, password }, callback) => {
-        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-            callback({ success: true, isAdmin: true });
-        } else {
-            callback({ success: false });
-        }
-    });
-
-    // Listen for user login
-    socket.on('login', ({ username, password }, callback) => {
-        const user = users.find((u) => u.username === username && u.password === password);
-        if (user) {
-            callback({ success: true, isAdmin: false });
-        } else {
-            callback({ success: false });
-        }
-    });
-
-    // Listen for user signup
-    socket.on('signup', ({ username, password }, callback) => {
-        const userExists = users.some((u) => u.username === username);
-        if (userExists) {
-            callback({ success: false, message: 'Username already exists' });
-        } else {
-            users.push({ username, password });
-            callback({ success: true, message: 'Signup successful! Please login.' });
         }
     });
 
@@ -91,7 +56,7 @@ io.on('connection', (socket) => {
         const { id, username } = data;
         const messageIndex = messages.findIndex((msg) => msg.id === id);
 
-        if (messageIndex !== -1 && (username === ADMIN_USERNAME || messages[messageIndex].username === username)) {
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
             messages = messages.filter((msg) => msg.id !== id);
             io.emit('removeMessage', id); // Broadcast the deleted message ID
         } else {
@@ -112,31 +77,14 @@ io.on('connection', (socket) => {
     });
 
     // Listen for admin actions
-    socket.on('clearAllMessages', (username) => {
-        if (username === ADMIN_USERNAME) {
-            messages = [];
-            io.emit('clearAllMessages'); // Broadcast to clear all messages
-        } else {
-            console.log('Unauthorized clear attempt');
-        }
+    socket.on('clearAllMessages', () => {
+        messages = [];
+        io.emit('clearAllMessages'); // Broadcast to clear all messages
     });
 
-    socket.on('clearAllUploads', (username) => {
-        if (username === ADMIN_USERNAME) {
-            files = [];
-            io.emit('clearAllUploads'); // Broadcast to clear all uploads
-        } else {
-            console.log('Unauthorized clear attempt');
-        }
-    });
-
-    socket.on('clearAllAccounts', (username) => {
-        if (username === ADMIN_USERNAME) {
-            users = [];
-            io.emit('clearAllAccounts'); // Broadcast to clear all accounts
-        } else {
-            console.log('Unauthorized clear attempt');
-        }
+    socket.on('clearAllUploads', () => {
+        files = [];
+        io.emit('clearAllUploads'); // Broadcast to clear all uploads
     });
 
     // Handle user disconnect
