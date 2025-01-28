@@ -42,10 +42,10 @@ io.on('connection', (socket) => {
     });
 
     // Message Handling
-    socket.on('sendMessage', ({ content }) => {
+    socket.on('sendMessage', ({ content, username }) => {
         const message = {
             id: Date.now().toString(),
-            username: currentUser,
+            username,
             content,
             timestamp: new Date().toLocaleString()
         };
@@ -53,9 +53,9 @@ io.on('connection', (socket) => {
         io.emit('updateMessages', messages);
     });
 
-    socket.on('editMessage', ({ messageId, newContent }) => {
+    socket.on('editMessage', ({ messageId, newContent, username }) => {
         const message = messages.find(m => m.id === messageId);
-        if (message && (message.username === currentUser || currentUser === ADMIN.username)) {
+        if (message && (message.username === username || username === ADMIN.username)) {
             message.content = newContent;
             io.emit('updateMessages', messages);
         }
@@ -67,10 +67,10 @@ io.on('connection', (socket) => {
     });
 
     // File Handling
-    socket.on('uploadFile', ({ filename, description, content }) => {
+    socket.on('uploadFile', ({ username, filename, description, content }) => {
         const file = {
             id: Date.now().toString(),
-            username: currentUser,
+            username,
             filename,
             description,
             content,
@@ -87,9 +87,9 @@ io.on('connection', (socket) => {
 
     // Admin Commands
     socket.on('adminCommand', (command) => {
-        if (currentUser !== ADMIN.username) return;
+        if (command.username !== ADMIN.username) return;
 
-        switch(command) {
+        switch(command.action) {
             case 'clearMessages':
                 messages = [];
                 io.emit('updateMessages', messages);
