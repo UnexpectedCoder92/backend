@@ -5,110 +5,96 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
 
-// Server-Side Storage
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*', // Allow all origins (replace with your frontend URL in production)
+        methods: ['GET', 'POST'],
+    },
+});
+
+// Store chat messages and files in memory (replace with a database in production)
 let messages = [];
 let files = [];
-let users = [];
-const ADMIN = { username: 'admin', password: 'hello' };
 
+// Socket.IO connection
 io.on('connection', (socket) => {
-    console.log('New connection:', socket.id);
+    console.log('A user connected:', socket.id);
 
-    // Initial data sync
-    socket.emit('updateMessages', messages);
-    socket.emit('updateFiles', files);
+    // Send existing messages and files to the new user
+    socket.emit('messages', messages);
+    socket.emit('files', files);
 
-    // Authentication
-    socket.on('auth', ({ action, username, password }, callback) => {
-        if (action === 'signup') {
-            if (users.some(u => u.username === username)) {
-                return callback({ success: false, message: 'Username exists' });
-            }
-            users.push({ username, password });
-        }
-
-        const user = username === ADMIN.username ? ADMIN : users.find(u => u.username === username);
-        if (!user || user.password !== password) {
-            return callback({ success: false, message: 'Invalid credentials' });
-        }
-
-        callback({ 
-            success: true,
-            isAdmin: username === ADMIN.username
-        });
-    });
-
-    // Message Handling
-    socket.on('sendMessage', ({ content, username }) => {
-        const message = {
-            id: Date.now().toString(),
-            username,
-            content,
-            timestamp: new Date().toLocaleString()
+    // Listen for new messages
+    socket.on('sendMessage', (message) => {
+        const newMessage = {
+            id: Date.now().toString(), // Ensure ID is a string
+            username: message.username,
+            content: message.content,
+            timestamp: new Date().toLocaleString(),
         };
-        messages.push(message);
-        io.emit('updateMessages', messages);
+        messages.push(newMessage);
+        io.emit('newMessage', newMessage); // Broadcast the message to all users
     });
 
-    socket.on('editMessage', ({ messageId, newContent, username }) => {
-        const message = messages.find(m => m.id === messageId);
-        if (message && (message.username === username || username === ADMIN.username)) {
-            message.content = newContent;
-            io.emit('updateMessages', messages);
+    // Listen for message edits
+    socket.on('editMessage', (data) => {
+        const { id, content, username } = data;
+        const messageIndex = messages.findIndex((msg) => msg.id === id);
+
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
+            messages[messageIndex].content = content;
+            io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
+        } else {
+            console.log('Unauthorized edit attempt');
         }
     });
 
-    socket.on('deleteMessage', ({ messageId }) => {
-        messages = messages.filter(m => m.id !== messageId);
-        io.emit('updateMessages', messages);
+    // Listen for message deletions
+    socket.on('deleteMessage', (data) => {
+        const { id, username } = data;
+        const messageIndex = messages.findIndex((msg) => msg.id === id);
+
+        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
+            messages = messages.filter((msg) => msg.id !== id);
+            io.emit('removeMessage', id); // Broadcast the deleted message ID
+        } else {
+            console.log('Unauthorized delete attempt');
+        }
     });
 
-    // File Handling
-    socket.on('uploadFile', ({ username, filename, description, content }) => {
-        const file = {
-            id: Date.now().toString(),
-            username,
-            filename,
-            description,
-            content,
-            timestamp: new Date().toLocaleString()
-        };
+    // Listen for file uploads
+    socket.on('uploadFile', (file) => {
         files.push(file);
-        io.emit('updateFiles', files);
+        io.emit('newFile', file); // Broadcast the new file to all users
     });
 
-    socket.on('deleteFile', ({ fileId }) => {
-        files = files.filter(f => f.id !== fileId);
-        io.emit('updateFiles', files);
+    // Listen for file deletions
+    socket.on('deleteFile', (fileId) => {
+        files = files.filter((file) => file.id !== fileId);
+        io.emit('removeFile', fileId); // Broadcast the deleted file ID
     });
 
-    // Admin Commands
-    socket.on('adminCommand', (command) => {
-        if (command.username !== ADMIN.username) return;
-
-        switch(command.action) {
-            case 'clearMessages':
-                messages = [];
-                io.emit('updateMessages', messages);
-                break;
-            case 'clearUploads':
-                files = [];
-                io.emit('updateFiles', files);
-                break;
-            case 'clearAccounts':
-                users = [];
-                break;
-        }
+    // Listen for admin actions
+    socket.on('clearAllMessages', () => {
+        messages = [];
+        io.emit('clearAllMessages'); // Broadcast to clear all messages
     });
 
-    // Connection cleanup
+    socket.on('clearAllUploads', () => {
+        files = [];
+        io.emit('clearAllUploads'); // Broadcast to clear all uploads
+    });
+
+    // Handle user disconnect
     socket.on('disconnect', () => {
-        console.log('Disconnected:', socket.id);
+        console.log('A user disconnected:', socket.id);
     });
 });
 
+// Start the server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+});
