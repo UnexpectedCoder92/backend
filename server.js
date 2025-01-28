@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const db = require('./database'); // Import the database utility
 
 const app = express();
 app.use(cors());
@@ -14,17 +15,16 @@ const io = new Server(server, {
     },
 });
 
-// Store chat messages and files in memory (replace with a database in production)
-let messages = [];
-let files = [];
+// Initialize the database
+db.initializeDatabase();
 
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Send existing messages and files to the new user
+    // Send existing messages to the new user
+    const messages = db.getMessages();
     socket.emit('messages', messages);
-    socket.emit('files', files);
 
     // Listen for new messages
     socket.on('sendMessage', (message) => {
@@ -34,18 +34,17 @@ io.on('connection', (socket) => {
             content: message.content,
             timestamp: new Date().toLocaleString(),
         };
-        messages.push(newMessage);
+        db.addMessage(newMessage.id, newMessage.username, newMessage.content, newMessage.timestamp);
         io.emit('newMessage', newMessage); // Broadcast the message to all users
     });
 
     // Listen for message edits
     socket.on('editMessage', (data) => {
         const { id, content, username } = data;
-        const messageIndex = messages.findIndex((msg) => msg.id === id);
-
-        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
-            messages[messageIndex].content = content;
-            io.emit('updateMessage', messages[messageIndex]); // Broadcast the updated message
+        const success = db.editMessage(id, content, username);
+        if (success) {
+            const updatedMessage = { id, username, content };
+            io.emit('updateMessage', updatedMessage); // Broadcast the updated message
         } else {
             console.log('Unauthorized edit attempt');
         }
@@ -54,37 +53,12 @@ io.on('connection', (socket) => {
     // Listen for message deletions
     socket.on('deleteMessage', (data) => {
         const { id, username } = data;
-        const messageIndex = messages.findIndex((msg) => msg.id === id);
-
-        if (messageIndex !== -1 && (username === 'admin' || messages[messageIndex].username === username)) {
-            messages = messages.filter((msg) => msg.id !== id);
+        const success = db.deleteMessage(id, username);
+        if (success) {
             io.emit('removeMessage', id); // Broadcast the deleted message ID
         } else {
             console.log('Unauthorized delete attempt');
         }
-    });
-
-    // Listen for file uploads
-    socket.on('uploadFile', (file) => {
-        files.push(file);
-        io.emit('newFile', file); // Broadcast the new file to all users
-    });
-
-    // Listen for file deletions
-    socket.on('deleteFile', (fileId) => {
-        files = files.filter((file) => file.id !== fileId);
-        io.emit('removeFile', fileId); // Broadcast the deleted file ID
-    });
-
-    // Listen for admin actions
-    socket.on('clearAllMessages', () => {
-        messages = [];
-        io.emit('clearAllMessages'); // Broadcast to clear all messages
-    });
-
-    socket.on('clearAllUploads', () => {
-        files = [];
-        io.emit('clearAllUploads'); // Broadcast to clear all uploads
     });
 
     // Handle user disconnect
